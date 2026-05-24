@@ -109,14 +109,17 @@ git clone https://github.com/TauricResearch/TradingAgents.git
 cd TradingAgents
 ```
 
-Create a virtual environment in any of your favorite environment managers:
+Install using [uv](https://github.com/astral-sh/uv) (recommended):
 ```bash
-conda create -n tradingagents python=3.13
-conda activate tradingagents
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install .
 ```
 
-Install the package and its dependencies:
+Alternatively, use pip:
 ```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install .
 ```
 
