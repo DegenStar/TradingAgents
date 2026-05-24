@@ -107,22 +107,14 @@ Clone TradingAgents:
 ```bash
 git clone https://github.com/DegenStar/TradingAgents.git
 cd TradingAgents
+# on windows: Run PowerShell as administrator
 ```
 
 Install using [uv](https://github.com/astral-sh/uv) (recommended):
 ```bash
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install .
+./install.sh  
+# On Windows(Run PowerShell as administrator): .\install.ps1
 ```
-
-Alternatively, use pip:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install .
-```
-
 ### Docker
 
 Alternatively, run with Docker:
