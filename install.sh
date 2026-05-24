@@ -470,8 +470,112 @@ run_step "持久化用户命令目录到 shell 配置" persist_runtime_path
 # Install uv for later uv tool usage
 run_step "检查并安装 uv（高性能包管理器）" check_install_uv
 
+setup_venv_auto_activation() {
+    local project_dir="$1"
+    local shell_name=""
+    local rc_files=()
+    local rc_file=""
+
+    shell_name="$(basename "${SHELL:-}")"
+    case "$shell_name" in
+        bash)
+            rc_files=("$HOME/.bashrc" "$HOME/.profile")
+            ;;
+        zsh)
+            rc_files=("$HOME/.zshrc" "$HOME/.zprofile")
+            ;;
+        *)
+            rc_files=("$HOME/.profile")
+            ;;
+    esac
+
+    for rc_file in "${rc_files[@]}"; do
+        if [ ! -e "$rc_file" ]; then
+            touch "$rc_file"
+        fi
+
+        # Check if auto-activation is already configured
+        if grep -Fq '# >>> venv auto-activation >>>' "$rc_file" 2>/dev/null; then
+            continue
+        fi
+
+        # Add venv auto-activation logic
+        cat >> "$rc_file" <<'EOF'
+
+# >>> venv auto-activation >>>
+_auto_activate_venv() {
+    local project_dir="$HOME/github/TradingAgents"
+    if [ "$PWD" = "$project_dir" ] || [[ "$PWD" == "$project_dir"* ]]; then
+        if [ -f "$project_dir/.venv/bin/activate" ] && [ -z "$VIRTUAL_ENV" ]; then
+            source "$project_dir/.venv/bin/activate"
+        fi
+    fi
+}
+
+case "$(basename "${SHELL:-}")" in
+    bash)
+        PROMPT_COMMAND="_auto_activate_venv;$PROMPT_COMMAND"
+        ;;
+    zsh)
+        if ! typeset -f chpwd_functions >/dev/null; then
+            typeset -ga chpwd_functions
+        fi
+        [[ -z "${chpwd_functions[(r)_auto_activate_venv]}" ]] && chpwd_functions+=(_auto_activate_venv)
+        ;;
+esac
+# <<< venv auto-activation <<<
+EOF
+        PATH_PERSIST_FILES+=("$rc_file")
+        break  # Only add to first available rc file
+    done
+}
+
+setup_uv_venv() {
+    local venv_path=".venv"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Check if uv is available
+    if ! command -v uv &>/dev/null; then
+        echo "WARN: uv 不可用，跳过虚拟环境设置" >&2
+        return 0
+    fi
+
+    # Create venv if it doesn't exist
+    if [ ! -d "$venv_path" ]; then
+        run_step "创建 UV 虚拟环境 ($script_dir/$venv_path)" uv venv
+    else
+        echo "虚拟环境已存在: $script_dir/$venv_path"
+    fi
+
+    # Activate venv for this script session
+    if [ -f "$venv_path/bin/activate" ]; then
+        source "$venv_path/bin/activate"
+        echo "已激活虚拟环境: $venv_path"
+    else
+        echo "WARN: 无法激活虚拟环境" >&2
+        return 1
+    fi
+
+    # Install current package in editable mode
+    if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+        run_step "安装当前包到虚拟环境 (editable mode)" uv pip install -e .
+    else
+        echo "WARN: 未找到 pyproject.toml 或 setup.py，跳过包安装" >&2
+    fi
+
+    # Set up automatic activation
+    setup_venv_auto_activation "$script_dir"
+
+    echo "虚拟环境设置完成！"
+    return 0
+}
+
 PIP_INSTALL_CMD=()
 FALLBACK_PIP_INSTALL_CMD=()
+
+# Set up UV virtual environment
+run_step "设置 UV 虚拟环境" setup_uv_venv
+
 build_python_package_install_cmd
 build_python_package_fallback_cmd
 
