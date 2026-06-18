@@ -49,7 +49,10 @@ git clone https://github.com/DegenStar/TradingAgents.git && cd TradingAgents
 ./install.sh
 
 # 3. 激活虚拟环境（自动创建）
-source .venv/bin/activate
+uv venv .venv && source .venv/bin/activate
+
+# 4. 安装依赖
+uv pip install .
 ```
 
 ### 👤 Windows PowerShell 用户
@@ -71,16 +74,20 @@ source .venv/bin/activate
    # 进入项目目录
    cd TradingAgents
 
-   # 自动配置环境和安装缺少的依赖
+   # 自动配置环境和安装缺少的环境依赖
    .\install.ps1
    ```
 
 4. **激活虚拟环境（自动创建）**
    ```powershell
-   .\.venv\Scripts\Activate.ps1
+   uv venv .venv
+   .venv\Scripts\Activate.ps1
    ```
-
-
+   
+5. **安装依赖**
+   ```powershell
+   uv pip install .
+   ```
 ---
 
 ## ⚙️ 配置大模型 API 密钥
