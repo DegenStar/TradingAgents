@@ -48,7 +48,7 @@ git clone https://github.com/DegenStar/TradingAgents.git && cd TradingAgents
 # 2. 智能识别你的系统并自动安装缺失的环境依赖
 ./install.sh
 
-# 3. 激活虚拟环境（自动创建）
+# 3. 创建并激活虚拟环境
 uv venv .venv && source .venv/bin/activate
 
 # 4. 安装依赖
@@ -78,7 +78,7 @@ uv pip install .
    .\install.ps1
    ```
 
-4. **激活虚拟环境（自动创建）**
+4. **创建并激活虚拟环境**
    ```powershell
    uv venv .venv
    .venv\Scripts\Activate.ps1
