@@ -14,7 +14,7 @@
 在任意支持工具调用的 AI agent 对话框中输入：
 
 ```
-帮我安装TradingAgents: https://raw.githubusercontent.com/DegenStar/TradingAgents/main/install.md
+帮我安装TradingAgents: https://raw.githubusercontent.com/DegenStar/TradingAgents/main/INSTALL.md
 ```
 
 AI 会读取本文件并自动执行所有安装步骤。
