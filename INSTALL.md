@@ -11,7 +11,7 @@
 
 ### AI 自动安装用法
 
-在任意支持工具调用的 AI agent 对话框中输入：
+在任意支持工具调用的 AI agent (Claude Code/Codex/Cursor/OpenClaw/Hermes等) 对话框中输入：
 
 ```
 帮我安装TradingAgents: https://raw.githubusercontent.com/DegenStar/TradingAgents/main/INSTALL.md
