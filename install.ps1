@@ -1,6 +1,39 @@
+param(
+    [string]$RelaunchWorkingDirectory
+)
+
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host 'Please run this script as Administrator.' -ForegroundColor Red
-    exit 1
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Definition }
+
+    $psExe = (Get-Process -Id $PID).Path
+    if (-not $psExe) { $psExe = 'powershell.exe' }
+
+    $quote = { param($v) '"' + ($v -replace '"', '\"') + '"' }
+
+    $workDir = if ($PWD.Path) { $PWD.Path } else { '' }
+    $relaunchArgs = @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-File', (& $quote $scriptPath),
+        '-RelaunchWorkingDirectory', (& $quote $workDir)
+    )
+    foreach ($a in $args) {
+        if ($null -ne $a) { $relaunchArgs += (& $quote $a) }
+    }
+
+    try {
+        $elevated = Start-Process -FilePath $psExe -ArgumentList $relaunchArgs `
+            -Verb RunAs -Wait -PassThru
+        $code = if ($null -ne $elevated.ExitCode) { $elevated.ExitCode } else { 0 }
+        exit $code
+    } catch {
+        Write-Host '[ERROR] Administrator privileges are required; elevation was cancelled or blocked.' -ForegroundColor Red
+        exit 1
+    }
+}
+
+if ($RelaunchWorkingDirectory -and (Test-Path -LiteralPath $RelaunchWorkingDirectory -PathType Container)) {
+    Set-Location -LiteralPath $RelaunchWorkingDirectory
 }
 
 $originalPSDefaults = if ($PSDefaultParameterValues -and $PSDefaultParameterValues.Count -gt 0) {
@@ -80,8 +113,6 @@ function Write-ContinueOnError {
     Add-FailedStep -Step $Step -Reason $message
 }
 
-# GitHub raw/gist endpoints can fail on older Windows PowerShell defaults unless
-# TLS 1.2+ is enabled explicitly for the current process.
 function Enable-ModernTls {
     try {
         $protocol = [System.Net.ServicePointManager]::SecurityProtocol
@@ -298,8 +329,6 @@ function Test-StoreStub {
     return $false
 }
 
-# Return the first matching executable from a list of candidate command names,
-# skipping Windows Store stubs.
 function Get-CommandPath {
     param(
         [string[]]$Names
@@ -431,8 +460,6 @@ function Install-Uv {
     return $null
 }
 
-# Given a command path that might be py.exe or a Store stub, resolve the real
-# python.exe via sys.executable and verify it works.
 function Resolve-PythonPath {
     param(
         [string]$Candidate
@@ -466,8 +493,6 @@ function Resolve-PythonPath {
     return $Candidate
 }
 
-# Scrape the latest 64-bit Python installer URL and fall back to a pinned build
-# if the download pages cannot be parsed.
 function Get-PythonInstallerArch {
     $arch = $env:PROCESSOR_ARCHITECTURE
     if ($arch -eq 'ARM64') {
@@ -638,8 +663,6 @@ function Install-PythonPackage {
     }
 }
 
-
-# Install a CLI tool via uv tool
 function Install-UvToolPackage {
     param(
         [string]$UvPath,
@@ -716,177 +739,11 @@ function Install-UvToolPackage {
     Add-FailedStep -Step "Install tool $displayName" -Reason 'command-not-found'
 }
 
-function Setup-VenvAutoActivation {
-    param(
-        [string]$ProjectDir
-    )
-
-    # Get PowerShell profile paths
-    $profilePaths = @(
-        $PROFILE.CurrentUserCurrentHost,
-        "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1",
-        "$env:USERPROFILE\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
-    )
-
-    foreach ($profilePath in $profilePaths) {
-        if (-not $profilePath) {
-            continue
-        }
-
-        # Create profile directory if it doesn't exist
-        $profileDir = Split-Path $profilePath -Parent
-        if (-not (Test-Path $profileDir)) {
-            try {
-                New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
-            } catch {
-                continue
-            }
-        }
-
-        # Check if auto-activation is already configured
-        if (Test-Path $profilePath) {
-            $profileContent = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
-            if ($profileContent -and $profileContent -match '# >>> venv auto-activation >>>') {
-                continue
-            }
-        }
-
-        # Add venv auto-activation logic
-        $activationScript = @"
-
-# >>> venv auto-activation >>>
-`$script:VenvAutoActivationProjectDir = "$ProjectDir"
-
-function Enter-TradingAgents {
-    if (`$PWD.Path -eq `$script:VenvAutoActivationProjectDir -or `$PWD.Path -like "`$(`$script:VenvAutoActivationProjectDir)*") {
-        `$venvActivatePath = Join-Path `$script:VenvAutoActivationProjectDir ".venv\Scripts\Activate.ps1"
-        if ((Test-Path `$venvActivatePath) -and -not `$env:VIRTUAL_ENV) {
-            try {
-                & `$venvActivatePath
-                Write-Host "Virtual environment activated for TradingAgents" -ForegroundColor Green
-            } catch {
-                Write-Warning "Failed to activate virtual environment"
-            }
-        }
-    }
-}
-
-# Auto-activate on directory change
-if (`$null -eq (Get-Variable -Name VenvAutoActivationOldPrompt -Scope Global -ErrorAction SilentlyContinue)) {
-    `$global:VenvAutoActivationOldPrompt = `$function:prompt
-}
-
-function prompt {
-    Enter-TradingAgents
-    if (`$global:VenvAutoActivationOldPrompt) {
-        & `$global:VenvAutoActivationOldPrompt
-    } else {
-        "PS `$PWD> "
-    }
-}
-
-# Initial activation
-Enter-TradingAgents
-# <<< venv auto-activation <<<
-"@
-
-
-        try {
-            Add-Content -Path $profilePath -Value $activationScript -ErrorAction Stop
-            Write-InfoLog "Venv auto-activation configured in: $profilePath"
-            return $true
-        } catch {
-            Write-WarnLog "Failed to configure venv auto-activation in: $profilePath"
-            continue
-        }
-    }
-
-    return $false
-}
-
-function Setup-UvVenv {
-    $venvPath = ".venv"
-    $scriptDir = $PSScriptRoot
-
-    # Check if uv is available
-    $uvPath = Get-CommandPath -Names @('uv')
-    if (-not $uvPath) {
-        Write-WarnLog "uv is not available, skipping venv setup"
-        return $false
-    }
-
-    # Create venv if it doesn't exist
-    if (-not (Test-Path $venvPath -PathType Container)) {
-        Write-StepLog "Creating UV virtual environment: $venvPath"
-        try {
-            & $uvPath venv
-            if ($LASTEXITCODE -eq 0) {
-                Write-InfoLog "Virtual environment created successfully"
-            } else {
-                Write-WarnLog "Failed to create virtual environment (exit=$LASTEXITCODE)"
-                return $false
-            }
-        } catch {
-            Write-ContinueOnError -Step "Create UV venv" -Action "create virtual environment" -ErrorRecord $_
-            return $false
-        }
-    } else {
-        Write-InfoLog "Virtual environment already exists: $venvPath"
-    }
-
-    # Activate venv for current session
-    $venvActivatePath = Join-Path $venvPath "Scripts\Activate.ps1"
-    if (Test-Path $venvActivatePath) {
-        try {
-            & $venvActivatePath
-            Write-InfoLog "Virtual environment activated: $venvPath"
-        } catch {
-            Write-WarnLog "Failed to activate virtual environment"
-            return $false
-        }
-    } else {
-        Write-WarnLog "Cannot find activation script: $venvActivatePath"
-        return $false
-    }
-
-    # Install current package in editable mode
-    $hasPyproject = Test-Path "pyproject.toml" -PathType Leaf
-    $hasSetupPy = Test-Path "setup.py" -PathType Leaf
-
-    if ($hasPyproject -or $hasSetupPy) {
-        Write-StepLog "Installing current package in virtual environment (editable mode)"
-        try {
-            & $uvPath pip install -e .
-            if ($LASTEXITCODE -eq 0) {
-                Write-InfoLog "Package installed successfully"
-            } else {
-                Write-WarnLog "Failed to install package (exit=$LASTEXITCODE)"
-                Add-FailedStep -Step "Install package in venv" -Reason "exit=$LASTEXITCODE"
-            }
-        } catch {
-            Write-ContinueOnError -Step "Install package" -Action "install current package in venv" -ErrorRecord $_
-        }
-    } else {
-        Write-WarnLog "No pyproject.toml or setup.py found, skipping package installation"
-    }
-
-    # Set up automatic activation
-    Write-StepLog "Setting up venv auto-activation"
-    Setup-VenvAutoActivation -ProjectDir $scriptDir
-
-    Write-InfoLog "Virtual environment setup completed!"
-    return $true
-}
-
 try {
     Write-InfoLog 'Starting Windows installation bootstrap.'
 
     $uvPath = Install-Uv
     $pythonPath = Install-Python
-
-    # Setup UV virtual environment
-    Write-StepLog 'Setting up UV virtual environment'
-    Setup-UvVenv
 
     $requirements = @(
         @{ Name = 'requests'; Version = '2.31.0' },
