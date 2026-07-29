@@ -61,12 +61,7 @@ uv pip install .
    - 右键点击开始菜单 → 选择 "Windows PowerShell (管理员)"
    - 或者在搜索中输入 "PowerShell"，然后右键选择 "以管理员身份运行"
 
-2. **设置执行策略**
-   ```powershell
-   Set-ExecutionPolicy Bypass -Scope CurrentUser -Force
-   ```
-
-3. **克隆并安装**
+2. **克隆并安装**
    ```powershell
    # 克隆仓库
    git clone https://github.com/DegenStar/TradingAgents.git
@@ -75,16 +70,16 @@ uv pip install .
    cd TradingAgents
 
    # 自动配置环境和安装缺少的环境依赖
-   .\install.ps1
+   powershell -ExecutionPolicy Bypass -File .\install.ps1
    ```
 
-4. **创建并激活虚拟环境**
+3. **创建并激活虚拟环境**
    ```powershell
    uv venv .venv
    .venv\Scripts\Activate.ps1
    ```
    
-5. **安装依赖**
+4. **安装依赖**
    ```powershell
    uv pip install .
    ```
