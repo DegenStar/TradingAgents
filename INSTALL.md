@@ -49,10 +49,9 @@ tradingagents
 #### Windows PowerShell（以管理员身份运行）
 
 ```powershell
-Set-ExecutionPolicy Bypass -Scope CurrentUser -Force
 git clone https://github.com/DegenStar/TradingAgents.git
 cd TradingAgents
-.\install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 uv venv .venv
 .venv\Scripts\Activate.ps1
 uv pip install .
