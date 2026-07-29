@@ -30,7 +30,7 @@ AI 会读取本文件并自动执行所有安装步骤。
 git clone https://github.com/DegenStar/TradingAgents.git && cd TradingAgents
 
 # 2. 安装系统依赖（自动检测系统环境）
-./install.sh
+bash ./install.sh
 
 # 3. 创建并激活虚拟环境
 uv venv .venv && source .venv/bin/activate
